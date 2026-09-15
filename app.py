@@ -199,35 +199,44 @@ if df is not None:
     elif tipo_analisis == "Comercial / Ventas":
         st.subheader("🛒 Dashboard Comercial Ejecutivo")
         c1, c2 = st.columns(2)
-        with c1: col_prod = st.selectbox("Producto/Categoría:", columnas_validas)
-        with c2: col_monto = st.selectbox("Monto de Venta:", columnas_validas)
+        with c1: col_prod = st.selectbox("Producto/Categoría:", columnas_validas, index=0)
         
-        # Limpieza automática: Convertir la columna a número eliminando texto o símbolos
-        df_ventas = df.copy()
-        df_ventas[col_monto] = pd.to_numeric(
-            df_ventas[col_monto].astype(str).str.replace(r'[^\d.-]', '', regex=True), 
-            errors='coerce'
-        ).fillna(0)
+        # Evitar que seleccione la misma columna para producto y monto por defecto
+        idx_monto = 1 if len(columnas_validas) > 1 else 0
+        with c2: col_monto = st.selectbox("Monto de Venta:", columnas_validas, index=idx_monto)
+        
+        if col_prod == col_monto:
+            st.warning("⚠️ Selecciona columnas diferentes para Producto y Monto de Venta.")
+        else:
+            df_ventas = df.copy()
+            
+            # Limpieza segura de montos (elimina $, comas, espacios y guiones)
+            df_ventas[col_monto] = pd.to_numeric(
+                df_ventas[col_monto].astype(str).str.replace(r'[\$,\- ]', '', regex=True), 
+                errors='coerce'
+            ).fillna(0)
 
-        ventas_totales = df_ventas[col_monto].sum()
-        ticket_prom = df_ventas[col_monto].mean()
-        cant_trans = len(df_ventas)
-        
-        # KPIs estilo tarjetas
-        k1, k2, k3 = st.columns(3)
-        k1.markdown(f'<div class="kpi-card"><div class="kpi-title">Ventas Totales</div><div class="kpi-value">${ventas_totales:,.2f}</div></div>', unsafe_allow_html=True)
-        k2.markdown(f'<div class="kpi-card"><div class="kpi-title">Ticket Promedio</div><div class="kpi-value">${ticket_prom:,.2f}</div></div>', unsafe_allow_html=True)
-        k3.markdown(f'<div class="kpi-card"><div class="kpi-title">Transacciones</div><div class="kpi-value">{cant_trans:,}</div></div>', unsafe_allow_html=True)
-        
-        resumen = df_ventas.groupby(col_prod)[col_monto].sum().reset_index().sort_values(by=col_monto, ascending=False).head(10)
-        
-        fig_bar = px.bar(
-            resumen, x=col_monto, y=col_prod, orientation='h',
-            title="<b>Top 10 Productos por Ventas</b>",
-            color=col_monto, color_continuous_scale="Viridis",
-            labels={col_monto: "Ventas (USD)", col_prod: "Producto"}
-        )
-        fig_bar.update_layout(yaxis=dict(autorange="reversed"), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8fafc")
-        st.plotly_chart(fig_bar, use_container_width=True)
+            ventas_totales = df_ventas[col_monto].sum()
+            ticket_prom = df_ventas[col_monto].mean()
+            cant_trans = len(df_ventas)
+            
+            # KPIs estilo tarjetas
+            k1, k2, k3 = st.columns(3)
+            k1.markdown(f'<div class="kpi-card"><div class="kpi-title">Ventas Totales</div><div class="kpi-value">${ventas_totales:,.2f}</div></div>', unsafe_allow_html=True)
+            k2.markdown(f'<div class="kpi-card"><div class="kpi-title">Ticket Promedio</div><div class="kpi-value">${ticket_prom:,.2f}</div></div>', unsafe_allow_html=True)
+            k3.markdown(f'<div class="kpi-card"><div class="kpi-title">Transacciones</div><div class="kpi-value">{cant_trans:,}</div></div>', unsafe_allow_html=True)
+            
+            # Agrupación segura evitando duplicados de nombres de columnas
+            resumen = df_ventas.groupby(col_prod, as_index=False)[col_monto].sum()
+            resumen = resumen.sort_values(by=col_monto, ascending=False).head(10)
+            
+            fig_bar = px.bar(
+                resumen, x=col_monto, y=col_prod, orientation='h',
+                title="<b>Top 10 Productos por Ventas</b>",
+                color=col_monto, color_continuous_scale="Viridis",
+                labels={col_monto: "Ventas (USD)", col_prod: "Producto"}
+            )
+            fig_bar.update_layout(yaxis=dict(autorange="reversed"), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8fafc")
+            st.plotly_chart(fig_bar, use_container_width=True)
 else:
     st.info("👈 Selecciona una fuente de datos en el panel izquierdo para comenzar.")
