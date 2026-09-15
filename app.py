@@ -198,19 +198,13 @@ if df is not None:
 
     elif tipo_analisis == "Comercial / Ventas":
         st.subheader("🛒 Dashboard Comercial Ejecutivo")
-        c1, c2 = st.columns(2)
-        with c1: col_prod = st.selectbox("Producto/Categoría:", columnas_validas, index=0)
         
-        # Evitar que seleccione la misma columna para producto y monto por defecto
+        col_prod = st.selectbox("Categoría / Producto / País:", columnas_validas, index=0)
         idx_monto = 1 if len(columnas_validas) > 1 else 0
-        with c2: col_monto = st.selectbox("Monto de Venta:", columnas_validas, index=idx_monto)
+        col_monto = st.selectbox("Monto de Venta:", columnas_validas, index=idx_monto)
         
-        if col_prod == col_monto:
-            st.warning("⚠️ Selecciona columnas diferentes para Producto y Monto de Venta.")
-        else:
+        if col_prod != col_monto:
             df_ventas = df.copy()
-            
-            # Limpieza segura de montos (elimina $, comas, espacios y guiones)
             df_ventas[col_monto] = pd.to_numeric(
                 df_ventas[col_monto].astype(str).str.replace(r'[\$,\- ]', '', regex=True), 
                 errors='coerce'
@@ -220,23 +214,47 @@ if df is not None:
             ticket_prom = df_ventas[col_monto].mean()
             cant_trans = len(df_ventas)
             
-            # KPIs estilo tarjetas
-            k1, k2, k3 = st.columns(3)
+            # --- CÁLCULO DE CONCENTRACIÓN Y PARETO ---
+            resumen = df_ventas.groupby(col_prod, as_index=False)[col_monto].sum()
+            resumen = resumen.sort_values(by=col_monto, ascending=False)
+            
+            top_1_monto = resumen[col_monto].iloc[0] if not resumen.empty else 0
+            pct_top_1 = (top_1_monto / ventas_totales * 100) if ventas_totales > 0 else 0
+            top_1_nombre = resumen[col_prod].iloc[0] if not resumen.empty else "N/A"
+
+            # 4 KPIs Ejecutivos
+            k1, k2, k3, k4 = st.columns(4)
             k1.markdown(f'<div class="kpi-card"><div class="kpi-title">Ventas Totales</div><div class="kpi-value">${ventas_totales:,.2f}</div></div>', unsafe_allow_html=True)
             k2.markdown(f'<div class="kpi-card"><div class="kpi-title">Ticket Promedio</div><div class="kpi-value">${ticket_prom:,.2f}</div></div>', unsafe_allow_html=True)
             k3.markdown(f'<div class="kpi-card"><div class="kpi-title">Transacciones</div><div class="kpi-value">{cant_trans:,}</div></div>', unsafe_allow_html=True)
+            k4.markdown(f'<div class="kpi-card"><div class="kpi-title">Líder ({top_1_nombre})</div><div class="kpi-value">{pct_top_1:.1f}%</div><span style="color:#64748b; font-size:12px;">del total de ventas</span></div>', unsafe_allow_html=True)
+
+            st.write("")
+
+            tab1, tab2 = st.tabs(["📊 Ranking de Ventas", "📈 Análisis de Pareto (80/20)"])
             
-            # Agrupación segura evitando duplicados de nombres de columnas
-            resumen = df_ventas.groupby(col_prod, as_index=False)[col_monto].sum()
-            resumen = resumen.sort_values(by=col_monto, ascending=False).head(10)
-            
-            fig_bar = px.bar(
-                resumen, x=col_monto, y=col_prod, orientation='h',
-                title="<b>Top 10 Productos por Ventas</b>",
-                color=col_monto, color_continuous_scale="Viridis",
-                labels={col_monto: "Ventas (USD)", col_prod: "Producto"}
-            )
-            fig_bar.update_layout(yaxis=dict(autorange="reversed"), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8fafc")
-            st.plotly_chart(fig_bar, use_container_width=True)
+            with tab1:
+                fig_bar = px.bar(
+                    resumen.head(10), x=col_monto, y=col_prod, orientation='h',
+                    title="<b>Top 10 en Ventas</b>",
+                    color=col_monto, color_continuous_scale="Viridis",
+                    labels={col_monto: "Ventas (USD)", col_prod: "Categoría"}
+                )
+                fig_bar.update_layout(yaxis=dict(autorange="reversed"), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8fafc")
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+            with tab2:
+                # Curva de Pareto (Venta Acumulada %)
+                resumen['pct_acumulado'] = (resumen[col_monto].cumsum() / ventas_totales) * 100
+                
+                fig_pareto = px.line(
+                    resumen, x=col_prod, y='pct_acumulado',
+                    title="<b>Curva Acumulada de Ingresos (Regla 80/20)</b>",
+                    labels={col_prod: "Categoría", 'pct_acumulado': "% Acumulado"},
+                    markers=True
+                )
+                fig_pareto.add_hline(y=80, line_dash="dash", line_color="red", annotation_text="Límite Pareto 80%")
+                fig_pareto.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8fafc", yaxis=dict(ticksuffix="%"))
+                st.plotly_chart(fig_pareto, use_container_width=True)
 else:
     st.info("👈 Selecciona una fuente de datos en el panel izquierdo para comenzar.")
