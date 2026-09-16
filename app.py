@@ -1,260 +1,362 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-import requests
 
-# Configuración de página
-st.set_page_config(page_title="Dashboard Ejecutivo", layout="wide", initial_sidebar_state="expanded")
+# ==========================================
+# CONFIGURACIÓN DE LA PÁGINA Y ESTILOS CSS
+# ==========================================
+st.set_page_config(
+    page_title="Multi-Dashboard Analítico Pro",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# CSS Personalizado para Tarjetas KPI estilo Excel/Sheets
 st.markdown("""
 <style>
-    .kpi-card {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 18px 20px;
-        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.05);
-        text-align: left;
-        margin-bottom: 10px;
+    /* Estilos globales y tarjetas KPI */
+    .main {
+        background-color: #0e1117;
     }
-    .kpi-title {
-        color: #64748b;
-        font-size: 13px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+    .stMetric {
+        background-color: #1e293b;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border: 1px solid #334155;
     }
-    .kpi-value {
-        color: #0f172a;
-        font-size: 26px;
-        font-weight: 700;
-        margin-top: 4px;
-        margin-bottom: 4px;
+    .stMetric label {
+        color: #94a3b8 !important;
+        font-size: 0.9rem !important;
     }
-    .kpi-badge-green {
-        color: #16a34a;
-        background-color: #dcfce7;
-        font-size: 12px;
-        font-weight: 600;
-        padding: 3px 8px;
-        border-radius: 20px;
-        display: inline-block;
-    }
-    .kpi-badge-red {
-        color: #dc2626;
-        background-color: #fee2e2;
-        font-size: 12px;
-        font-weight: 600;
-        padding: 3px 8px;
-        border-radius: 20px;
-        display: inline-block;
+    .stMetric div[data-testid="stMetricValue"] {
+        color: #f8fafc !important;
+        font-weight: 700 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Plataforma de Dashboards & Analítica Executiva")
+# ==========================================
+# DICCIONARIO DE ENFOQUES DE ANÁLISIS
+# ==========================================
+OPCIONES_ANALISIS = {
+    "Comercial / Ventas": [
+        "Resumen General de Ventas",
+        "Análisis de Concentración (Pareto 80/20)",
+        "Distribución y Variabilidad del Ticket"
+    ],
+    "Financiero / Presupuesto": [
+        "Estructura y Totales de Ingresos / Gastos",
+        "Análisis de Distribución de Costos",
+        "Desviación y Márgenes"
+    ],
+    "Educación / Académico": [
+        "Rendimiento Académico General",
+        "Análisis de Aprobación vs Reprobación",
+        "Distribución de Calificaciones (Boxplot)"
+    ],
+    "Estadístico / Científico": [
+        "Estadística Descriptiva Completa",
+        "Matriz de Correlación",
+        "Detección de Valores Atípicos (Outliers)"
+    ]
+}
 
-# ---------------------------------------------------------
-# BARRA LATERAL
-# ---------------------------------------------------------
-st.sidebar.header("⚙️ Configuración")
+# ==========================================
+# BARRA LATERAL (SIDEBAR)
+# ==========================================
+st.sidebar.title("⚙️ Configuración")
+
+# 1. Selección de Dominio Principal
 tipo_analisis = st.sidebar.selectbox(
     "Dominio de Análisis:",
-    ["Financiero / Cripto / Divisas", "Comercial / Ventas", "Estadística Avanzada"]
+    list(OPCIONES_ANALISIS.keys())
 )
-fuente_datos = st.sidebar.radio("Fuente de Datos:", ["Archivo Local (CSV/Excel)", "API en Tiempo Real"])
+
+# 2. Selección de Sub-análisis Dinámico
+sub_analisis = st.sidebar.selectbox(
+    "Enfoque Analítico Específico:",
+    OPCIONES_ANALISIS[tipo_analisis]
+)
+
+st.sidebar.markdown("---")
+fuente_datos = st.sidebar.radio("Fuente de Datos:", ["Archivo Local (CSV/Excel)", "API en Tiempo Real / Demo"])
 
 df = None
 
 if fuente_datos == "Archivo Local (CSV/Excel)":
-    archivo_subido = st.sidebar.file_uploader("Sube tu archivo:", type=["csv", "xlsx"])
-    if archivo_subido is not None:
+    uploaded_file = st.sidebar.file_uploader("Sube tu archivo data:", type=["csv", "xlsx", "xls"])
+    if uploaded_file is not None:
         try:
-            df = pd.read_csv(archivo_subido) if archivo_subido.name.endswith('.csv') else pd.read_excel(archivo_subido)
-            st.sidebar.success("¡Archivo cargado!")
+            if uploaded_file.name.endswith(".csv"):
+                df = pd.read_csv(uploaded_file)
+            else:
+                df = pd.read_excel(uploaded_file)
+            st.sidebar.success("¡Archivo cargado con éxito!")
         except Exception as e:
-            st.sidebar.error(f"Error: {e}")
+            st.sidebar.error(f"Error al leer el archivo: {e}")
 else:
-    st.sidebar.subheader("🌐 Conexión API")
-    cripto_id = st.sidebar.selectbox("Activo:", ["ethereum", "bitcoin", "tether", "binancecoin", "solana"])
-    dias = st.sidebar.slider("Días de Histórico:", 7, 365, 30)
-    
-    if st.sidebar.button("Consultar API"):
-        url = f"https://api.coingecko.com/api/v3/coins/{cripto_id}/market_chart?vs_currency=usd&days={dias}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            prices = data.get("prices", [])
-            df = pd.DataFrame(prices, columns=["timestamp", "value"])
-            df["date"] = pd.to_datetime(df["timestamp"], unit="ms")
-            df["currency"] = cripto_id.upper()
-            st.sidebar.success("¡Datos recuperados!")
-        else:
-            st.sidebar.error("Error al consultar la API.")
+    # Cargar Dataset de Demostración según el dominio seleccionado
+    np.random.seed(42)
+    n = 200
+    if tipo_analisis == "Comercial / Ventas":
+        categorias = ["USA", "UK", "Germany", "Canada", "Australia", "India", "UAE"]
+        df = pd.DataFrame({
+            "Categoria": np.random.choice(categorias, size=n, p=[0.4, 0.2, 0.15, 0.1, 0.08, 0.04, 0.03]),
+            "Monto": np.random.exponential(scale=150, size=n) + 10
+        })
+    elif tipo_analisis == "Financiero / Presupuesto":
+        conceptos = ["Nómina", "Marketing", "Infraestructura", "Servicios", "Suministros", "Ventas Proyectadas"]
+        df = pd.DataFrame({
+            "Concepto": np.random.choice(conceptos, size=n),
+            "Monto": np.random.uniform(500, 15000, size=n)
+        })
+    elif tipo_analisis == "Educación / Académico":
+        materias = ["Matemáticas", "Física", "Química", "Programación", "Estadística"]
+        df = pd.DataFrame({
+            "Materia": np.random.choice(materias, size=n),
+            "Nota": np.random.normal(loc=14, scale=3.5, size=n).clip(0, 20)
+        })
+    else: # Estadístico / Científico
+        df = pd.DataFrame({
+            "Variable_A": np.random.normal(50, 10, n),
+            "Variable_B": np.random.normal(100, 25, n),
+            "Variable_C": np.random.exponential(20, n),
+            "Monto": np.random.normal(250, 50, n)
+        })
+    st.sidebar.info("Cargados datos de demostración automáticos.")
 
-# ---------------------------------------------------------
-# CONTENIDO PRINCIPAL
-# ---------------------------------------------------------
+# ==========================================
+# CUERPO PRINCIPAL DEL DASHBOARD
+# ==========================================
+st.title("📊 Multi-Dashboard Analítico Interactivo")
+
 if df is not None:
-    columnas_validas = [c for c in df.columns if not c.startswith('Unnamed')]
+    columnas_validas = list(df.columns)
     
-    with st.expander("👀 Vista previa de la tabla de datos"):
-        st.dataframe(df[columnas_validas].head(10), use_container_width=True)
-
-    if tipo_analisis == "Financiero / Cripto / Divisas":
-        st.subheader("📈 Analítica Financiera de Alto Impacto")
+    # ---------------------------------------------------
+    # MÓDULO 1: COMERCIAL / VENTAS
+    # ---------------------------------------------------
+    if tipo_analisis == "Comercial / Ventas":
+        st.subheader(f"🛒 Análisis Comercial: {sub_analisis}")
         
-        idx_fecha = columnas_validas.index('date') if 'date' in columnas_validas else 0
-        idx_moneda = columnas_validas.index('currency') if 'currency' in columnas_validas else 0
-        idx_valor = columnas_validas.index('value') if 'value' in columnas_validas else 0
-
-        c1, c2, c3 = st.columns(3)
-        with c1: col_fecha = st.selectbox("Columna Fecha:", columnas_validas, index=idx_fecha)
-        with c2: col_categoria = st.selectbox("Columna Activo/Divisa:", columnas_validas, index=idx_moneda)
-        with c3: col_valor = st.selectbox("Columna Precio/Tasa:", columnas_validas, index=idx_valor)
-
-        df[col_fecha] = pd.to_datetime(df[col_fecha])
-        df_sorted = df.sort_values(col_fecha)
-
-        categorias_unicas = sorted(df_sorted[col_categoria].dropna().unique().tolist())
-        cat_sel = st.multiselect("Filtrar Activos:", categorias_unicas, default=categorias_unicas[:1])
-
-        if cat_sel:
-            df_fin = df_sorted[df_sorted[col_categoria].isin(cat_sel)].copy()
-            moneda_ref = cat_sel[0]
-            df_ref = df_fin[df_fin[col_categoria] == moneda_ref]
-            
-            precio_actual = df_ref[col_valor].iloc[-1] if not df_ref.empty else 0
-            precio_inicial = df_ref[col_valor].iloc[0] if not df_ref.empty else 0
-            var_pct = ((precio_actual - precio_inicial) / precio_inicial) * 100 if precio_inicial != 0 else 0
-            max_hist = df_fin[col_valor].max()
-            min_hist = df_fin[col_valor].min()
-            volatilidad = (df_fin[col_valor].std() / df_fin[col_valor].mean()) * 100 if df_fin[col_valor].mean() != 0 else 0
-
-            # --- TARJETAS KPI ESTILO SHEETS/EXCEL ---
-            k1, k2, k3, k4 = st.columns(4)
-            
-            badge_class = "kpi-badge-green" if var_pct >= 0 else "kpi-badge-red"
-            badge_icon = "▲" if var_pct >= 0 else "▼"
-            
-            k1.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-title">Último Precio ({moneda_ref})</div>
-                <div class="kpi-value">${precio_actual:,.2f}</div>
-                <span class="{badge_class}">{badge_icon} {var_pct:+.2f}%</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-            k2.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-title">Máximo Registrado</div>
-                <div class="kpi-value">${max_hist:,.2f}</div>
-                <span style="color:#64748b; font-size:12px;">Pico del periodo</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-            k3.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-title">Mínimo Registrado</div>
-                <div class="kpi-value">${min_hist:,.2f}</div>
-                <span style="color:#64748b; font-size:12px;">Piso del periodo</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-            k4.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-title">Volatilidad Histórica</div>
-                <div class="kpi-value">{volatilidad:.2f}%</div>
-                <span style="color:#64748b; font-size:12px;">Riesgo relativo</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-            st.write("") # Espaciador visual
-
-            # --- GRÁFICO TIPO EXCEL ESTILIZADO (AREA CHART) ---
-            fig_area = px.area(
-                df_fin, 
-                x=col_fecha, 
-                y=col_valor, 
-                color=col_categoria,
-                title="<b>Tendencia Histórica de Cotización</b>",
-                labels={col_fecha: "Fecha", col_valor: "Precio (USD)", col_categoria: "Activo"},
-                color_discrete_sequence=px.colors.qualitative.Bold
-            )
-            
-            # Estilizado avanzado de Plotly
-            fig_area.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(248,250,252,1)",
-                font=dict(family="Segoe UI, sans-serif", size=12, color="#334155"),
-                xaxis=dict(showgrid=True, gridcolor="#e2e8f0"),
-                yaxis=dict(showgrid=True, gridcolor="#e2e8f0", tickprefix="$"),
-                hovermode="x unified",
-                margin=dict(l=20, r=20, t=50, b=20)
-            )
-            st.plotly_chart(fig_area, use_container_width=True)
-
-    elif tipo_analisis == "Comercial / Ventas":
-        st.subheader("🛒 Dashboard Comercial Ejecutivo")
-        
-        col_prod = st.selectbox("Categoría / Producto / País:", columnas_validas, index=0)
+        c1, c2 = st.columns(2)
+        with c1: col_prod = st.selectbox("Categoría / Producto / País:", columnas_validas, index=0)
         idx_monto = 1 if len(columnas_validas) > 1 else 0
-        col_monto = st.selectbox("Monto de Venta:", columnas_validas, index=idx_monto)
+        with c2: col_monto = st.selectbox("Monto de Venta / Valor:", columnas_validas, index=idx_monto)
         
-        if col_prod != col_monto:
-            df_ventas = df.copy()
-            df_ventas[col_monto] = pd.to_numeric(
-                df_ventas[col_monto].astype(str).str.replace(r'[\$,\- ]', '', regex=True), 
+        if col_prod == col_monto:
+            st.warning("⚠️ Selecciona columnas diferentes para la Categoría y el Monto.")
+        else:
+            df_v = df.copy()
+            df_v[col_monto] = pd.to_numeric(
+                df_v[col_monto].astype(str).str.replace(r'[\$,\- ]', '', regex=True), 
                 errors='coerce'
             ).fillna(0)
 
-            ventas_totales = df_ventas[col_monto].sum()
-            ticket_prom = df_ventas[col_monto].mean()
-            cant_trans = len(df_ventas)
-            
-            # --- CÁLCULO DE CONCENTRACIÓN Y PARETO ---
-            resumen = df_ventas.groupby(col_prod, as_index=False)[col_monto].sum()
-            resumen = resumen.sort_values(by=col_monto, ascending=False)
-            
-            top_1_monto = resumen[col_monto].iloc[0] if not resumen.empty else 0
-            pct_top_1 = (top_1_monto / ventas_totales * 100) if ventas_totales > 0 else 0
-            top_1_nombre = resumen[col_prod].iloc[0] if not resumen.empty else "N/A"
+            if sub_analisis == "Resumen General de Ventas":
+                ventas_totales = df_v[col_monto].sum()
+                ticket_prom = df_v[col_monto].mean()
+                cant_trans = len(df_v)
+                
+                k1, k2, k3 = st.columns(3)
+                k1.metric("Ventas Totales", f"${ventas_totales:,.2f}")
+                k2.metric("Ticket Promedio", f"${ticket_prom:,.2f}")
+                k3.metric("Transacciones", f"{cant_trans:,}")
 
-            # 4 KPIs Ejecutivos
-            k1, k2, k3, k4 = st.columns(4)
-            k1.markdown(f'<div class="kpi-card"><div class="kpi-title">Ventas Totales</div><div class="kpi-value">${ventas_totales:,.2f}</div></div>', unsafe_allow_html=True)
-            k2.markdown(f'<div class="kpi-card"><div class="kpi-title">Ticket Promedio</div><div class="kpi-value">${ticket_prom:,.2f}</div></div>', unsafe_allow_html=True)
-            k3.markdown(f'<div class="kpi-card"><div class="kpi-title">Transacciones</div><div class="kpi-value">{cant_trans:,}</div></div>', unsafe_allow_html=True)
-            k4.markdown(f'<div class="kpi-card"><div class="kpi-title">Líder ({top_1_nombre})</div><div class="kpi-value">{pct_top_1:.1f}%</div><span style="color:#64748b; font-size:12px;">del total de ventas</span></div>', unsafe_allow_html=True)
-
-            st.write("")
-
-            tab1, tab2 = st.tabs(["📊 Ranking de Ventas", "📈 Análisis de Pareto (80/20)"])
-            
-            with tab1:
-                fig_bar = px.bar(
-                    resumen.head(10), x=col_monto, y=col_prod, orientation='h',
-                    title="<b>Top 10 en Ventas</b>",
+                resumen = df_v.groupby(col_prod, as_index=False)[col_monto].sum().sort_values(by=col_monto, ascending=False).head(10)
+                
+                fig = px.bar(
+                    resumen, x=col_monto, y=col_prod, orientation='h',
+                    title="<b>Top 10 en Ventas Totalizadas</b>",
                     color=col_monto, color_continuous_scale="Viridis",
                     labels={col_monto: "Ventas (USD)", col_prod: "Categoría"}
                 )
-                fig_bar.update_layout(yaxis=dict(autorange="reversed"), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8fafc")
-                st.plotly_chart(fig_bar, use_container_width=True)
+                fig.update_layout(yaxis=dict(autorange="reversed"), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.5)", font=dict(color="#f8fafc"))
+                st.plotly_chart(fig, use_container_width=True)
 
-            with tab2:
-                # Curva de Pareto (Venta Acumulada %)
-                resumen['pct_acumulado'] = (resumen[col_monto].cumsum() / ventas_totales) * 100
+            elif sub_analisis == "Análisis de Concentración (Pareto 80/20)":
+                resumen = df_v.groupby(col_prod, as_index=False)[col_monto].sum().sort_values(by=col_monto, ascending=False)
+                ventas_totales = resumen[col_monto].sum()
+                resumen['pct_acumulado'] = (resumen[col_monto].cumsum() / ventas_totales) * 100 if ventas_totales > 0 else 0
                 
-                fig_pareto = px.line(
+                top_20_count = int(max(1, np.ceil(len(resumen) * 0.2)))
+                ventas_top_20 = resumen.head(top_20_count)[col_monto].sum()
+                concentracion_real = (ventas_top_20 / ventas_totales * 100) if ventas_totales > 0 else 0
+                
+                k1, k2, k3 = st.columns(3)
+                k1.metric("Total Categorías/Países", f"{len(resumen)}")
+                k2.metric("Top 20% Grupos Contabilizados", f"{top_20_count}")
+                k3.metric("Concentración Top 20% (Pareto)", f"{concentracion_real:.1f}%")
+
+                fig = px.line(
                     resumen, x=col_prod, y='pct_acumulado',
-                    title="<b>Curva Acumulada de Ingresos (Regla 80/20)</b>",
-                    labels={col_prod: "Categoría", 'pct_acumulado': "% Acumulado"},
-                    markers=True
+                    title="<b>Curva Acumulada de Ingresos (Regla Pareto 80/20)</b>",
+                    markers=True, labels={col_prod: "Categoría", 'pct_acumulado': "% Acumulado"}
                 )
-                fig_pareto.add_hline(y=80, line_dash="dash", line_color="red", annotation_text="Límite Pareto 80%")
-                fig_pareto.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#f8fafc", yaxis=dict(ticksuffix="%"))
-                st.plotly_chart(fig_pareto, use_container_width=True)
+                fig.add_hline(y=80, line_dash="dash", line_color="red", annotation_text="Límite Pareto 80%")
+                fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.5)", font=dict(color="#f8fafc"), yaxis=dict(ticksuffix="%"))
+                st.plotly_chart(fig, use_container_width=True)
+
+            elif sub_analisis == "Distribución y Variabilidad del Ticket":
+                mediana = df_v[col_monto].median()
+                desv_est = df_v[col_monto].std()
+                val_max = df_v[col_monto].max()
+                
+                k1, k2, k3 = st.columns(3)
+                k1.metric("Mediana del Monto", f"${mediana:,.2f}")
+                k2.metric("Desviación Estándar", f"${desv_est:,.2f}")
+                k3.metric("Monto Máximo Transaccionado", f"${val_max:,.2f}")
+
+                fig = px.box(
+                    df_v, x=col_prod, y=col_monto, color=col_prod,
+                    title="<b>Distribución de Valores por Categoria (Boxplot)</b>",
+                    labels={col_monto: "Monto", col_prod: "Categoría"}
+                )
+                fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.5)", font=dict(color="#f8fafc"))
+                st.plotly_chart(fig, use_container_width=True)
+
+    # ---------------------------------------------------
+    # MÓDULO 2: FINANCIERO / PRESUPUESTO
+    # ---------------------------------------------------
+    elif tipo_analisis == "Financiero / Presupuesto":
+        st.subheader(f"💰 Análisis Financiero: {sub_analisis}")
+        
+        c1, c2 = st.columns(2)
+        with c1: col_cat = st.selectbox("Concepto / Categoría:", columnas_validas, index=0)
+        idx_num = 1 if len(columnas_validas) > 1 else 0
+        with c2: col_val = st.selectbox("Monto / Importe:", columnas_validas, index=idx_num)
+        
+        df_f = df.copy()
+        df_f[col_val] = pd.to_numeric(df_f[col_val].astype(str).str.replace(r'[\$,\- ]', '', regex=True), errors='coerce').fillna(0)
+
+        if sub_analisis == "Estructura y Totales de Ingresos / Gastos":
+            monto_total = df_f[col_val].sum()
+            promedio = df_f[col_val].mean()
+            num_registros = len(df_f)
+            
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Monto Total Evaluado", f"${monto_total:,.2f}")
+            k2.metric("Importe Promedio", f"${promedio:,.2f}")
+            k3.metric("Total Registros", f"{num_registros:,}")
+
+            resumen_f = df_f.groupby(col_cat, as_index=False)[col_val].sum()
+            fig = px.pie(resumen_f, names=col_cat, values=col_val, title="<b>Distribución Porcentual por Concepto</b>", hole=0.4)
+            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#f8fafc"))
+            st.plotly_chart(fig, use_container_width=True)
+
+        elif sub_analisis == "Análisis de Distribución de Costos":
+            resumen_f = df_f.groupby(col_cat, as_index=False)[col_val].sum().sort_values(by=col_val, ascending=False)
+            fig = px.bar(resumen_f, x=col_cat, y=col_val, title="<b>Estructura Desglosada por Categoría</b>", color=col_val, color_continuous_scale="Reds")
+            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.5)", font=dict(color="#f8fafc"))
+            st.plotly_chart(fig, use_container_width=True)
+
+        elif sub_analisis == "Desviación y Márgenes":
+            std_val = df_f[col_val].std()
+            max_val = df_f[col_val].max()
+            min_val = df_f[col_val].min()
+
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Desviación Estándar", f"${std_val:,.2f}")
+            k2.metric("Monto Máximo", f"${max_val:,.2f}")
+            k3.metric("Monto Mínimo", f"${min_val:,.2f}")
+
+            fig = px.histogram(df_f, x=col_val, nbins=20, title="<b>Frecuencia y Dispersión de Registros Financieros</b>", color_discrete_sequence=['#38bdf8'])
+            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.5)", font=dict(color="#f8fafc"))
+            st.plotly_chart(fig, use_container_width=True)
+
+    # ---------------------------------------------------
+    # MÓDULO 3: EDUCACIÓN / ACADÉMICO
+    # ---------------------------------------------------
+    elif tipo_analisis == "Educación / Académico":
+        st.subheader(f"🎓 Análisis Académico: {sub_analisis}")
+        
+        c1, c2 = st.columns(2)
+        with c1: col_grupo = st.selectbox("Materia / Curso / Grupo:", columnas_validas, index=0)
+        idx_nota = 1 if len(columnas_validas) > 1 else 0
+        with c2: col_nota = st.selectbox("Calificación / Nota:", columnas_validas, index=idx_nota)
+        
+        df_e = df.copy()
+        df_e[col_nota] = pd.to_numeric(df_e[col_nota], errors='coerce').fillna(0)
+
+        if sub_analisis == "Rendimiento Académico General":
+            prom_gen = df_e[col_nota].mean()
+            mediana_nota = df_e[col_nota].median()
+            total_eval = len(df_e)
+
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Promedio General", f"{prom_gen:.2f}")
+            k2.metric("Calificación Mediana", f"{mediana_nota:.2f}")
+            k3.metric("Estudiantes / Evaluaciones", f"{total_eval}")
+
+            resumen_e = df_e.groupby(col_grupo, as_index=False)[col_nota].mean().sort_values(by=col_nota, ascending=False)
+            fig = px.bar(resumen_e, x=col_grupo, y=col_nota, title="<b>Promedio por Materia / Grupo</b>", color=col_nota, color_continuous_scale="Blues")
+            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.5)", font=dict(color="#f8fafc"))
+            st.plotly_chart(fig, use_container_width=True)
+
+        elif sub_analisis == "Análisis de Aprobación vs Reprobación":
+            corte_aprob = st.slider("Nota Mínima de Aprobación:", min_value=0, max_value=100, value=10 if df_e[col_nota].max() <= 20 else 60)
+            
+            aprobados = len(df_e[df_e[col_nota] >= corte_aprob])
+            reprobados = len(df_e[df_e[col_nota] < corte_aprob])
+            pct_aprob = (aprobados / len(df_e) * 100) if len(df_e) > 0 else 0
+
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Aprobados", f"{aprobados}")
+            k2.metric("Reprobados", f"{reprobados}")
+            k3.metric("Tasa de Aprobación", f"{pct_aprob:.1f}%")
+
+            df_status = pd.DataFrame({"Estado": ["Aprobado", "Reprobado"], "Cantidad": [aprobados, reprobados]})
+            fig = px.pie(df_status, names="Estado", values="Cantidad", title="<b>Proporción Aprobados vs Reprobados</b>", color="Estado", color_discrete_map={"Aprobado": "#22c55e", "Reprobado": "#ef4444"})
+            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#f8fafc"))
+            st.plotly_chart(fig, use_container_width=True)
+
+        elif sub_analisis == "Distribución de Calificaciones (Boxplot)":
+            fig = px.box(df_e, x=col_grupo, y=col_nota, color=col_grupo, title="<b>Dispersión de Notas por Materia</b>")
+            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.5)", font=dict(color="#f8fafc"))
+            st.plotly_chart(fig, use_container_width=True)
+
+    # ---------------------------------------------------
+    # MÓDULO 4: ESTADÍSTICO / CIENTÍFICO
+    # ---------------------------------------------------
+    elif tipo_analisis == "Estadístico / Científico":
+        st.subheader(f"🔬 Análisis Estadístico: {sub_analisis}")
+        
+        num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        if len(num_cols) == 0:
+            st.error("No se encontraron columnas numéricas en el dataset cargado.")
+        else:
+            if sub_analisis == "Estadística Descriptiva Completa":
+                st.write("<b>Resumen Cuantitativo:</b>", unsafe_allow_html=True)
+                st.dataframe(df[num_cols].describe().T.style.background_gradient(cmap="viridis"))
+
+            elif sub_analisis == "Matriz de Correlación":
+                corr_matrix = df[num_cols].corr()
+                fig = px.imshow(corr_matrix, text_auto=True, title="<b>Matriz de Correlación de Pearson</b>", color_continuous_scale="Viridis")
+                fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#f8fafc"))
+                st.plotly_chart(fig, use_container_width=True)
+
+            elif sub_analisis == "Detección de Valores Atípicos (Outliers)":
+                col_sel = st.selectbox("Selecciona Variable Numérica:", num_cols)
+                
+                q1 = df[col_sel].quantile(0.25)
+                q3 = df[col_sel].quantile(0.75)
+                iqr = q3 - q1
+                lower_bound = q1 - (1.5 * iqr)
+                upper_bound = q3 + (1.5 * iqr)
+                outliers = df[(df[col_sel] < lower_bound) | (df[col_sel] > upper_bound)]
+
+                k1, k2, k3 = st.columns(3)
+                k1.metric("Rango Intercuartílico (IQR)", f"{iqr:.2f}")
+                k2.metric("Límite Inferior / Superior", f"{lower_bound:.1f} / {upper_bound:.1f}")
+                k3.metric("Total Outliers Detectados", f"{len(outliers)}")
+
+                fig = px.box(df, y=col_sel, points="all", title=f"<b>Análisis de Atípicos para {col_sel}</b>")
+                fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.5)", font=dict(color="#f8fafc"))
+                st.plotly_chart(fig, use_container_width=True)
+
 else:
-    st.info("👈 Selecciona una fuente de datos en el panel izquierdo para comenzar.")
+    st.info("👈 Por favor, carga un archivo CSV/Excel en la barra lateral o selecciona 'API en Tiempo Real / Demo'.")
