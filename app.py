@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import requests
 
 # ==========================================
 # CONFIGURACIÓN DE LA PÁGINA Y ESTILOS CSS
@@ -98,14 +99,18 @@ if fuente_datos == "Archivo Local (CSV/Excel)":
         except Exception as e:
             st.sidebar.error(f"Error al leer el archivo: {e}")
 else:
-    # Cargar Dataset de Demostración según el dominio seleccionado
-    np.random.seed(42)
-    n = 200
-    if tipo_analisis == "Comercial / Ventas":
-        categorias = ["USA", "UK", "Germany", "Canada", "Australia", "India", "UAE"]
-        df = pd.DataFrame({
-            "Categoria": np.random.choice(categorias, size=n, p=[0.4, 0.2, 0.15, 0.1, 0.08, 0.04, 0.03]),
-            "Monto": np.random.exponential(scale=150, size=n) + 10
+    try:
+        # Reemplaza la URL con la API que vas a consumir
+        url_api = "https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=usd" 
+        respuesta = requests.get(url_api)
+        datos_json = respuesta.json()
+        
+        # Convertimos la respuesta a DataFrame
+        df = pd.DataFrame(datos_json)
+        
+        st.sidebar.success("¡Datos cargados exitosamente desde la API!")
+    except Exception as e:
+        st.sidebar.error(f"Error al conectar con la API: {e}")
         })
     elif tipo_analisis == "Financiero / Presupuesto":
         conceptos = ["Nómina", "Marketing", "Infraestructura", "Servicios", "Suministros", "Ventas Proyectadas"]
