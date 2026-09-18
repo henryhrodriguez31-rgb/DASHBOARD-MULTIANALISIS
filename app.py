@@ -111,28 +111,7 @@ else:
         st.sidebar.success("¡Datos cargados exitosamente desde la API!")
     except Exception as e:
         st.sidebar.error(f"Error al conectar con la API: {e}")
-        
-    elif tipo_analisis == "Financiero / Presupuesto":
-        conceptos = ["Nómina", "Marketing", "Infraestructura", "Servicios", "Suministros", "Ventas Proyectadas"]
-        df = pd.DataFrame({
-            "Concepto": np.random.choice(conceptos, size=n),
-            "Monto": np.random.uniform(500, 15000, size=n)
-        })
-    elif tipo_analisis == "Educación / Académico":
-        materias = ["Matemáticas", "Física", "Química", "Programación", "Estadística"]
-        df = pd.DataFrame({
-            "Materia": np.random.choice(materias, size=n),
-            "Nota": np.random.normal(loc=14, scale=3.5, size=n).clip(0, 20)
-        })
-    else: # Estadístico / Científico
-        df = pd.DataFrame({
-            "Variable_A": np.random.normal(50, 10, n),
-            "Variable_B": np.random.normal(100, 25, n),
-            "Variable_C": np.random.exponential(20, n),
-            "Monto": np.random.normal(250, 50, n)
-        })
-    st.sidebar.info("Cargados datos de demostración automáticos.")
-
+       
 # ==========================================
 # CUERPO PRINCIPAL DEL DASHBOARD
 # ==========================================
