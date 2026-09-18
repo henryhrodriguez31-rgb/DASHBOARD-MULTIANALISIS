@@ -111,7 +111,7 @@ else:
         st.sidebar.success("¡Datos cargados exitosamente desde la API!")
     except Exception as e:
         st.sidebar.error(f"Error al conectar con la API: {e}")
-        })
+        
     elif tipo_analisis == "Financiero / Presupuesto":
         conceptos = ["Nómina", "Marketing", "Infraestructura", "Servicios", "Suministros", "Ventas Proyectadas"]
         df = pd.DataFrame({
