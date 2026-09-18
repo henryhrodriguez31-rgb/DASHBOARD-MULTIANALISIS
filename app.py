@@ -100,15 +100,32 @@ if fuente_datos == "Archivo Local (CSV/Excel)":
             st.sidebar.error(f"Error al leer el archivo: {e}")
 else:
     try:
-        # Reemplaza la URL con la API que vas a consumir
-        url_api = "https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=usd" 
-        respuesta = requests.get(url_api)
-        datos_json = respuesta.json()
-        
-        # Convertimos la respuesta a DataFrame
-        df = pd.DataFrame(datos_json)
-        
-        st.sidebar.success("¡Datos cargados exitosamente desde la API!")
+        if tipo_analisis == "Financiero / Presupuesto":
+            # API Multimoneda (Cripto y Divisas)
+            url_api = "https://api.coingecko.com/api/v3/simple/price?ids=tether,bitcoin,solana,ripple,ethereum&vs_currencies=usd,eur,ves"
+            respuesta = requests.get(url_api).json()
+            
+            # Formateamos los datos para crear un DataFrame tabular
+            datos_list = []
+            for moneda, precios in respuesta.items():
+                datos_list.append({"Moneda": moneda.upper(), "Monto": precios["usd"], "USD": precios["usd"], "EUR": precios["eur"]})
+            df = pd.DataFrame(datos_list)
+            
+        elif tipo_analisis == "Comercial / Ventas":
+            # API Multi información (Ejemplo: Datos de prueba JSONPlaceholder)
+            url_api = "https://jsonplaceholder.typicode.com/posts"
+            respuesta = requests.get(url_api).json()
+            df = pd.DataFrame(respuesta)
+            df = df.rename(columns={"userId": "Categoria", "id": "Monto"})
+            
+        else:
+            # Opción general o por defecto
+            url_api = "https://api.coingecko.com/api/v3/simple/price?ids=tether,bitcoin,solana,binancecoin&vs_currencies=usd"
+            respuesta = requests.get(url_api).json()
+            datos_list = [{"Moneda": k.upper(), "Monto": v["usd"]} for k, v in respuesta.items()]
+            df = pd.DataFrame(datos_list)
+            
+        st.sidebar.success("¡Datos en vivo cargados con éxito!")
     except Exception as e:
         st.sidebar.error(f"Error al conectar con la API: {e}")
        
