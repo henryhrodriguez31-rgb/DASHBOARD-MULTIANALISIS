@@ -99,16 +99,19 @@ if fuente_datos == "Archivo Local (CSV/Excel)":
         except Exception as e:
             st.sidebar.error(f"Error al leer el archivo: {e}")
 else:
-    try:
-        if tipo_analisis == "Financiero / Presupuesto":
-            # API Multimoneda (Cripto y Divisas)
-            url_api = "https://api.coingecko.com/api/v3/simple/price?ids=tether,bitcoin,solana,ripple,ethereum&vs_currencies=usd,eur,ves"
+    elif tipo_analisis == "Financiero / Presupuesto":
+            # API de CoinGecko con varias criptomonedas
+            url_api = "https://api.coingecko.com/api/v3/simple/price?ids=tether,bitcoin,ethereum,solana,ripple&vs_currencies=usd"
             respuesta = requests.get(url_api).json()
             
-            # Formateamos los datos para crear un DataFrame tabular
-            datos_list = []
-            for moneda, precios in respuesta.items():
-                datos_list.append({"Moneda": moneda.upper(), "Monto": precios["usd"], "USD": precios["usd"], "EUR": precios["eur"]})
+            # Estructuramos la información
+            datos_list = [
+                {"Moneda": "Tether (USDT)", "Monto": respuesta["tether"]["usd"]},
+                {"Moneda": "Ripple (XRP)", "Monto": respuesta["ripple"]["usd"]},
+                {"Moneda": "Solana (SOL)", "Monto": respuesta["solana"]["usd"]},
+                {"Moneda": "Ethereum (ETH)", "Monto": respuesta["ethereum"]["usd"]},
+                {"Moneda": "Bitcoin (BTC)", "Monto": respuesta["bitcoin"]["usd"]}
+            ]
             df = pd.DataFrame(datos_list)
             
         elif tipo_analisis == "Comercial / Ventas":
