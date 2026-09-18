@@ -99,7 +99,7 @@ if fuente_datos == "Archivo Local (CSV/Excel)":
         except Exception as e:
             st.sidebar.error(f"Error al leer el archivo: {e}")
 else:
-    elif tipo_analisis == "Financiero / Presupuesto":
+        elif tipo_analisis == "Financiero / Presupuesto":
             # API de CoinGecko con varias criptomonedas
             url_api = "https://api.coingecko.com/api/v3/simple/price?ids=tether,bitcoin,ethereum,solana,ripple&vs_currencies=usd"
             respuesta = requests.get(url_api).json()
