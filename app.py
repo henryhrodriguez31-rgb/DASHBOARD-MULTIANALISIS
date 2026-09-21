@@ -102,18 +102,31 @@ else:
     # Lógica para consultar las APIs según la categoría seleccionada
     try:
         if tipo_analisis == "Financiero / Presupuesto":
-            # API Cripto / Multimoneda
-            url_api = "https://api.coingecko.com/api/v3/simple/price?ids=tether,bitcoin,ethereum,solana,ripple&vs_currencies=usd"
+            # Petición a la API consultando precios en USD y EUR
+            url_api = "https://api.coingecko.com/api/v3/simple/price?ids=tether,bitcoin,ethereum,solana,ripple&vs_currencies=usd,eur"
             respuesta = requests.get(url_api).json()
             
+            # Formateamos los datos en una tabla comparativa
             datos_list = [
-                {"Moneda": "Tether (USDT)", "Monto": respuesta["tether"]["usd"]},
-                {"Moneda": "Ripple (XRP)", "Monto": respuesta["ripple"]["usd"]},
-                {"Moneda": "Solana (SOL)", "Monto": respuesta["solana"]["usd"]},
-                {"Moneda": "Ethereum (ETH)", "Monto": respuesta["ethereum"]["usd"]},
-                {"Moneda": "Bitcoin (BTC)", "Monto": respuesta["bitcoin"]["usd"]}
+                {"Moneda": "Tether (USDT)", "Precio USD": respuesta["tether"]["usd"], "Precio EUR": respuesta["tether"]["eur"], "Monto": respuesta["tether"]["usd"]},
+                {"Moneda": "Ripple (XRP)", "Precio USD": respuesta["ripple"]["usd"], "Precio EUR": respuesta["ripple"]["eur"], "Monto": respuesta["ripple"]["usd"]},
+                {"Moneda": "Solana (SOL)", "Precio USD": respuesta["solana"]["usd"], "Precio EUR": respuesta["solana"]["eur"], "Monto": respuesta["solana"]["usd"]},
+                {"Moneda": "Ethereum (ETH)", "Precio USD": respuesta["ethereum"]["usd"], "Precio EUR": respuesta["ethereum"]["eur"], "Monto": respuesta["ethereum"]["usd"]},
+                {"Moneda": "Bitcoin (BTC)", "Precio USD": respuesta["bitcoin"]["usd"], "Precio EUR": respuesta["bitcoin"]["eur"], "Monto": respuesta["bitcoin"]["usd"]}
             ]
+            
             df = pd.DataFrame(datos_list)
+            
+            # Selector dinamico en la barra lateral para comparar o filtrar monedas
+            monedas_seleccionadas = st.sidebar.multiselect(
+                "Filtrar / Comparar Monedas:",
+                options=df["Moneda"].tolist(),
+                default=df["Moneda"].tolist()
+            )
+            
+            # Filtramos el DataFrame según la selección del usuario
+            if monedas_seleccionadas:
+                df = df[df["Moneda"].isin(monedas_seleccionadas)]
 
         elif tipo_analisis == "Comercial / Ventas":
             # API de prueba multi-información
