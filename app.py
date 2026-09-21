@@ -99,12 +99,13 @@ if fuente_datos == "Archivo Local (CSV/Excel)":
         except Exception as e:
             st.sidebar.error(f"Error al leer el archivo: {e}")
 else:
-        elif tipo_analisis == "Financiero / Presupuesto":
-            # API de CoinGecko con varias criptomonedas
+    # Lógica para consultar las APIs según la categoría seleccionada
+    try:
+        if tipo_analisis == "Financiero / Presupuesto":
+            # API Cripto / Multimoneda
             url_api = "https://api.coingecko.com/api/v3/simple/price?ids=tether,bitcoin,ethereum,solana,ripple&vs_currencies=usd"
             respuesta = requests.get(url_api).json()
             
-            # Estructuramos la información
             datos_list = [
                 {"Moneda": "Tether (USDT)", "Monto": respuesta["tether"]["usd"]},
                 {"Moneda": "Ripple (XRP)", "Monto": respuesta["ripple"]["usd"]},
@@ -113,21 +114,21 @@ else:
                 {"Moneda": "Bitcoin (BTC)", "Monto": respuesta["bitcoin"]["usd"]}
             ]
             df = pd.DataFrame(datos_list)
-            
+
         elif tipo_analisis == "Comercial / Ventas":
-            # API Multi información (Ejemplo: Datos de prueba JSONPlaceholder)
+            # API de prueba multi-información
             url_api = "https://jsonplaceholder.typicode.com/posts"
             respuesta = requests.get(url_api).json()
             df = pd.DataFrame(respuesta)
             df = df.rename(columns={"userId": "Categoria", "id": "Monto"})
-            
+
         else:
-            # Opción general o por defecto
-            url_api = "https://api.coingecko.com/api/v3/simple/price?ids=tether,bitcoin,solana,binancecoin&vs_currencies=usd"
+            # Opción por defecto para otros dominios
+            url_api = "https://api.coingecko.com/api/v3/simple/price?ids=tether,bitcoin,solana&vs_currencies=usd"
             respuesta = requests.get(url_api).json()
             datos_list = [{"Moneda": k.upper(), "Monto": v["usd"]} for k, v in respuesta.items()]
             df = pd.DataFrame(datos_list)
-            
+
         st.sidebar.success("¡Datos en vivo cargados con éxito!")
     except Exception as e:
         st.sidebar.error(f"Error al conectar con la API: {e}")
